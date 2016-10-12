@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <title>Chat</title>
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+</head>
+<body>
+
+<h1>Welcome to chat!</h1>
+
+<h1>Авторизация</h1>
+
+  <form id="publish">
+    <input  type="text" name="message">
+    <input  type="submit" value="Отправить">
+  </form>
+
+  <ul id="messages"></ul>
+
+<script>
+
+  //Отправляем сообщение на сервер
+  publish.onsubmit = function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/publish", true);
+    xhr.send(JSON.stringify({message: this.elements.message.value}));
+    this.elements.message.value = "";
+    return false;
+  }
+
+  //Изпользуем long-polling(длинные запросы - такой алгоритм общения с сервером)
+  //Устанавливаем соединение, сообщаем о себе серверу, чтобы в случае новых
+  //сообщений - нам их прислали.
+  subscribe();
+
+  function subscribe() {
+    var xhr = new XMLHttpRequest()
+    xhr.open("GET", "/subscribe", true);
+    xhr.onload = function() {
+      var li = document.createElement('li');
+      li.textContent = this.responseText;
+      messages.insertBefore(li, messages.firstChild);
+      //рекурсия
+      subscribe();
+    }
+    //если ошибка - делаем небольшую задержу и опять устанавливаем соединение
+    xhr.onerror = xhr.onabort = function() {
+      setTimeout(subscribe, 500);
+    }
+
+    xhr.send('');
+
+  }
+
+  //Если зашли первый раз - получаем историю сообщений
+  var status = "new client";
+  if(status == "new client") {
+    (function() {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", "/get_messages", true);
+      xhr.onload = function() {
+         var array_messages = this.responseText.split("###");
+         for(var i = 0; i < array_messages.length; i++) {
+           var li = document.createElement('li');
+           li.textContent = array_messages[i];
+           console.log(li.textContent);
+           messages.insertBefore(li, messages.firstChild);
+         }
+      }
+      xhr.send();
+      status = "old client";
+    }());
+  }
+
+</script>
+
+</body>
+</html>
